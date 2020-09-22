@@ -1,0 +1,102 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'net.researchgate.release' version '2.8.1'
+    id "maven-publish"
+    id "org.hidetake.ssh" version "2.10.1"
+}
+
+
+group 'com.github.simkuenzi'
+version version
+
+java {
+    sourceCompatibility JavaVersion.VERSION_14
+    targetCompatibility JavaVersion.VERSION_14
+}
+
+application {
+    mainClass = 'com.github.simkuenzi.foweb.Server'
+}
+
+repositories {
+    mavenCentral()
+    jcenter()
+    maven {
+        url = 'https://repository.jboss.org/nexus/content/repositories/thirdparty-releases'
+    }
+}
+
+dependencies {
+    implementation group: 'io.javalin', name: 'javalin', version: '3.9.1'
+    implementation group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.30'
+    implementation group: 'org.apache.xmlgraphics', name: 'fop', version: '2.5'
+    testImplementation group: 'junit', name: 'junit', version: '4.12'
+}
+
+jar {
+    manifest {
+        attributes 'Implementation-Title': "${project.name} server",
+                'Implementation-Version': this.version,
+                'Main-Class': 'com.github.simkuenzi.foweb.Server'
+    }
+    archiveClassifier.set("all")
+    from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+publishing {
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/simkuenzi/foweb")
+            credentials {
+                username = System.getenv("GIT_USER")
+                password = System.getenv("GIT_TOKEN")
+            }
+        }
+    }
+    publications {
+        gpr(MavenPublication) {
+            from(components.java)
+        }
+    }
+}
+
+remotes {
+    webServer {
+        host = System.properties['deployServer']
+        user = System.properties['deployUser']
+        identity = file(System.properties['deployIdentity'] ?: 'id_rsa')
+    }
+}
+
+task createProperties(dependsOn: processResources) {
+    doLast {
+        File d = new File("$buildDir/resources/main/com/github/simkuenzi/foweb")
+        d.mkdirs()
+        new File(d, "version.properties").withWriter { w ->
+            Properties p = new Properties()
+            p['version'] = project.version.toString()
+            p.store w, null
+        }
+    }
+}
+
+task deploy(dependsOn: jar) {
+    doLast {
+        ssh.run {
+            session(remotes.webServer) {
+                put from: jar.archiveFile.get().asFile, into: System.properties['deployPath']
+            }
+        }
+    }
+}
+
+classes {
+    dependsOn createProperties
+}
+
+release {
+    buildTasks = ['publish', 'deploy']
+}
