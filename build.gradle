@@ -53,8 +53,8 @@ publishing {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/simkuenzi/foweb")
             credentials {
-                username = System.getenv("GIT_USER")
-                password = System.getenv("GIT_TOKEN")
+                username = project.ext.properties.gitUser
+                password = project.ext.properties.gitToken
             }
         }
     }
@@ -67,9 +67,9 @@ publishing {
 
 remotes {
     webServer {
-        host = System.properties['deployServer']
-        user = System.properties['deployUser']
-        identity = file(System.properties['deployIdentity'] ?: 'id_rsa')
+        host = project.ext.properties.deployServer
+        user = project.ext.properties.deployUser
+        identity = file(project.ext.properties.deployKey ?: 'id_rsa')
     }
 }
 
@@ -89,7 +89,7 @@ task deploy(dependsOn: jar) {
     doLast {
         ssh.run {
             session(remotes.webServer) {
-                put from: jar.archiveFile.get().asFile, into: System.properties['deployPath']
+                put from: jar.archiveFile.get().asFile, into: "${project.ext.properties.deployPath}/${project.name}/${project.name}.jar"
             }
         }
     }
