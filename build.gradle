@@ -33,6 +33,7 @@ dependencies {
     implementation(group: 'org.apache.xmlgraphics', name: 'fop', version: '2.5') {
         exclude group: 'javax.servlet', module: 'servlet-api'
     }
+    implementation group: 'net.sf.saxon', name: 'Saxon-HE', version: '10.2'
     testImplementation group: 'junit', name: 'junit', version: '4.12'
 }
 
@@ -42,9 +43,6 @@ jar {
                 'Implementation-Version': this.version,
                 'Main-Class': 'com.github.simkuenzi.foweb.Server'
     }
-    archiveClassifier.set("all")
-    from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
-    duplicatesStrategy = DuplicatesStrategy.INCLUDE
 }
 
 publishing {
@@ -89,7 +87,11 @@ task deploy(dependsOn: jar) {
     doLast {
         ssh.run {
             session(remotes.webServer) {
-                put from: jar.archiveFile.get().asFile, into: "${project.ext.properties.deployPath}/${project.name}/${project.name}.jar"
+                put from: file("build/distributions/${project.name}-${project.version}.tar"), into: "${project.ext.properties.deployPath}/${project.name}/${project.name}.tar"
+                execute "rm -rf ${project.ext.properties.deployPath}/${project.name}/dist"
+                execute "mkdir ${project.ext.properties.deployPath}/${project.name}/dist"
+                execute "tar -xf ${project.ext.properties.deployPath}/${project.name}/${project.name}.tar --strip-components=1 -C ${project.ext.properties.deployPath}/${project.name}/dist"
+                execute "touch ${project.ext.properties.deployPath}/${project.name}/restart"
             }
         }
     }
