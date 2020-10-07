@@ -83,7 +83,7 @@ task createProperties(dependsOn: processResources) {
     }
 }
 
-task deploy(dependsOn: jar) {
+task deploy(dependsOn: build) {
     doLast {
         ssh.run {
             session(remotes.webServer) {
