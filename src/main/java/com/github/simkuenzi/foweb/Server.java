@@ -12,9 +12,7 @@ import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.sax.SAXResult;
 import javax.xml.transform.stream.StreamSource;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -61,23 +59,30 @@ public class Server {
 
         .get("/", ctx -> ctx.result("curl -d @cv.xml  http://pi/foweb/cv.fo.xslt | ssh pi \"cat > /home/simon/CV/cv.pdf\""))
         .post("/:xslt", ctx -> {
-            Properties properties = new Properties();
-            try (InputStream in = Files.newInputStream(base.resolve("conf.properties"))) {
-                properties.load(in);
-            }
+            try {
+                Properties properties = new Properties();
+                try (InputStream in = Files.newInputStream(base.resolve("conf.properties"))) {
+                    properties.load(in);
+                }
 
-            Path xconf = Path.of(properties.getProperty("fopConfig"));
-            Path xsltDir = Path.of(properties.getProperty("xsltDir"));
-            Path xslt = xsltDir.resolve(ctx.pathParam("xslt"));
-            FopFactory fopFactory = FopFactory.newInstance(xconf.toFile());
-            ByteArrayOutputStream pdf = new ByteArrayOutputStream();
-            Fop fop = fopFactory.newFop(MimeConstants.MIME_PDF, pdf);
-            TransformerFactory factory = TransformerFactory.newInstance();
-            Transformer transformer = factory.newTransformer(new StreamSource(Files.newInputStream(xslt)));
-            Source src = new StreamSource(new ByteArrayInputStream(ctx.bodyAsBytes()));
-            Result res = new SAXResult(fop.getDefaultHandler());
-            transformer.transform(src, res);
-            ctx.contentType(MimeConstants.MIME_PDF).result(new ByteArrayInputStream(pdf.toByteArray()));
+                Path xconf = Path.of(properties.getProperty("fopConfig"));
+                Path xsltDir = Path.of(properties.getProperty("xsltDir"));
+                Path xslt = xsltDir.resolve(ctx.pathParam("xslt"));
+                FopFactory fopFactory = FopFactory.newInstance(xconf.toFile());
+                ByteArrayOutputStream pdf = new ByteArrayOutputStream();
+                Fop fop = fopFactory.newFop(MimeConstants.MIME_PDF, pdf);
+                TransformerFactory factory = TransformerFactory.newInstance();
+                Transformer transformer = factory.newTransformer(new StreamSource(Files.newInputStream(xslt)));
+                Source src = new StreamSource(new ByteArrayInputStream(ctx.bodyAsBytes()));
+                Result res = new SAXResult(fop.getDefaultHandler());
+                transformer.transform(src, res);
+                ctx.contentType(MimeConstants.MIME_PDF).result(new ByteArrayInputStream(pdf.toByteArray()));
+            } catch (Throwable e) {
+                StringWriter stringWriter = new StringWriter();
+                PrintWriter printWriter = new PrintWriter(stringWriter);
+                e.printStackTrace(printWriter);
+                ctx.status(500).result(stringWriter.toString());
+            }
         });
     }
 }
